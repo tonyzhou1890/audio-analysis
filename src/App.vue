@@ -83,6 +83,10 @@ export default {
             sampleRate: buffer.sampleRate,
             numberOfChannels: buffer.numberOfChannels
           }
+          this._audioData.frameIndex = new Uint32Array(buffer.length)
+          for (let i = 0; i < buffer.length; i++) {
+            this._audioData.frameIndex[i] = i
+          }
           if (buffer.numberOfChannels === 1) {
             this._audioData.channelData = [buffer.getChannelData(0)]
           } else if (buffer.numberOfChannels === 2) {
