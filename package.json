@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "core-js": "^3.4.3",
+    "less": "^3.10.3",
+    "less-loader": "^5.0.0",
     "vue": "^2.6.10"
   },
   "devDependencies": {
@@ -32,6 +34,10 @@
     "rules": {},
     "parserOptions": {
       "parser": "babel-eslint"
+    },
+    "globals": {
+      "window": true,
+      "echarts": true
     }
   },
   "browserslist": [
