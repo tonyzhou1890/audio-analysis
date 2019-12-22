@@ -1,5 +1,7 @@
 <template>
-  <div ref="chart" class="main" />
+  <div ref="chartContainer" class="main">
+    <canvas ref="chart" class="chart" />
+  </div>
 </template>
 
 <script>
@@ -15,7 +17,16 @@ export default {
     return {
       width: null,
       height: null,
-      tempData: [0.3, 0.1, -0.5, 1, 0, -1]
+      padding: 10, // canvas padding
+      yAxisWidth: 30, // y轴宽度--包括文字
+      xAxisHeight: 20, // x轴高度--包括文字
+      scrollHeight: 30, // 滚动条区域高度
+      axisColor: '#eee', // 轴线颜色
+      color: '#ddd', // 波形颜色
+      axisFontSize: 16, // 轴线字体大小
+      lessThanPixel: false, // 点的数量是否小于像素数量
+      startIndex: 0, // 开始绘制的点的索引
+      endIndex: 0 // 结束绘制的点的索引
     }
   },
   mounted() {
@@ -33,156 +44,187 @@ export default {
     },
     // 绘制canvas
     draw() {
-      if (!this._echartInstance) {
-        this._echartInstance = echarts.init(this.$refs.chart)
-      }
-
       // 声道数
       const channels = this._audioData.rawBuffer.numberOfChannels
+      const chart = this.$refs.chart
+      chart.width = this.width
+      chart.height = this.height
+      const ctx = chart.getContext('2d')
+      window.ctx = ctx
+      this.drawAxis({ ctx, channels })
+      this.drawPoints({ ctx, channels })
+    },
+    // 绘制坐标系
+    drawAxis(params) {
+      const { ctx, channels } = params
+      // 波形图半程高度
+      const yBlockHeight = (this.height - this.padding * 2 - this.xAxisHeight - this.scrollHeight) / (channels === 2 ? 4 : 2)
+      // y轴基点距左边距离
+      const yAxisLeft = this.yAxisWidth + this.padding
 
+      ctx.strokeStyle = this.axisColor || this.color
+      ctx.fillStyle = this.axisColor || this.color
+      ctx.lineWidth = 2
+      ctx.font = `${this.axisFontSize}px Arial`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.beginPath()
       // x 轴
-      const _xAxis = {
-        type: 'category',
-        splitLine: {
-          show: false
-        },
-        axisLine: {
-          lineStyle: {
-            color: '#eee'
-          }
-        },
-        axisTick: {
-          lineStyle: {
-            color: '#eee'
-          }
-        },
-        axisLabel: {
-          color: '#eee'
-        }
-        // data: [...this._audioData.frameIndex]
-      }
-
-      const xAxis = [{ ..._xAxis }]
-      if (channels === 2) {
-        xAxis.push({ ..._xAxis, gridIndex: 1, position: 'top' })
-      }
+      ctx.moveTo(yAxisLeft, this.height - this.padding - this.xAxisHeight - this.scrollHeight)
+      ctx.lineTo(this.width - this.padding, this.height - this.padding - this.xAxisHeight - this.scrollHeight)
+      ctx.stroke()
 
       // y 轴
-      const _yAxis = {
-        type: 'value',
-        min: -1,
-        max: 1,
-        splitLine: {
-          show: false
-        },
-        axisLine: {
-          lineStyle: {
-            color: '#eee'
-          }
-        },
-        axisTick: {
-          lineStyle: {
-            color: '#eee'
-          }
-        },
-        axisLabel: {
-          color: '#eee'
-        }
-      }
-
-      const yAxis = [{ ..._yAxis }]
+      ctx.beginPath()
+      ctx.textAlign = 'right'
       if (channels === 2) {
-        yAxis.push({ ..._yAxis, gridIndex: 1 })
-      }
+        ctx.moveTo(yAxisLeft - 2, this.padding + 10)
+        ctx.lineTo(yAxisLeft - 2, this.padding + yBlockHeight * 2 - 10)
+        ctx.moveTo(yAxisLeft - 2, this.padding + yBlockHeight * 2 + 10)
+        ctx.lineTo(yAxisLeft - 2, this.height - this.padding - this.xAxisHeight - this.scrollHeight - 10)
 
-      // series
-      const _series = {
-        type: 'line',
-        data: this._audioData.channelData[0],
-        dimensions: ['x', 'y'],
-        large: true
-        // data: this.tempData
-      }
+        // splitAxis
+        ctx.moveTo(yAxisLeft - 10, this.padding + 10)
+        ctx.lineTo(yAxisLeft - 2, this.padding + 10)
+        ctx.moveTo(yAxisLeft - 10, this.padding + yBlockHeight)
+        ctx.lineTo(yAxisLeft - 2, this.padding + yBlockHeight)
+        ctx.moveTo(yAxisLeft - 10, this.padding + yBlockHeight * 2 - 10)
+        ctx.lineTo(yAxisLeft - 2, this.padding + yBlockHeight * 2 - 10)
+        ctx.fillText('1', yAxisLeft - 15, this.padding + 10)
+        ctx.fillText('0', yAxisLeft - 15, this.padding + yBlockHeight)
+        ctx.fillText('-1', yAxisLeft - 15, this.padding + yBlockHeight * 2 - 10)
 
-      const series = [{ ..._series }]
-      if (channels === 2) {
-        series.push({
-          ..._series,
-          xAxisIndex: 1,
-          yAxisIndex: 1,
-          data: this._audioData.channelData[1],
-          dimensions: ['x', 'y'],
-          large: true
-          // data: this.tempData
-        })
-      }
-
-      // dataZoom
-      const dataZoom = [
-        {
-          show: true,
-          realtime: true,
-          start: 0,
-          end: 100
-        },
-        {
-          type: 'inside',
-          realtime: true,
-          start: 0,
-          end: 100
-        }
-      ]
-
-      if (channels === 2) {
-        dataZoom[0].xAxisIndex = [0, 1]
-        dataZoom[1].xAxisIndex = [0, 1]
-      }
-
-      // grid
-      const _grid = {
-        left: 50,
-        right: 50,
-        height: '40%'
-      }
-
-      const grid = [{ ..._grid }]
-      if (channels === 2) {
-        grid.push({
-          ..._grid,
-          top: '55%'
-        })
+        ctx.moveTo(yAxisLeft - 10, this.padding + yBlockHeight * 2 + 10)
+        ctx.lineTo(yAxisLeft - 2, this.padding + yBlockHeight * 2 + 10)
+        ctx.moveTo(yAxisLeft - 10, this.padding + yBlockHeight * 3)
+        ctx.lineTo(yAxisLeft - 2, this.padding + yBlockHeight * 3)
+        ctx.moveTo(yAxisLeft - 10, this.padding + yBlockHeight * 4 - 10)
+        ctx.lineTo(yAxisLeft - 2, this.padding + yBlockHeight * 4 - 10)
+        ctx.fillText('1', yAxisLeft - 15, this.padding + yBlockHeight * 2 + 10)
+        ctx.fillText('0', yAxisLeft - 15, this.padding + yBlockHeight * 3)
+        ctx.fillText('-1', yAxisLeft - 15, this.padding + yBlockHeight * 4 - 10)
       } else {
-        grid[0].height = '80%'
+        ctx.moveTo(yAxisLeft - 2, this.padding + 10)
+        ctx.lineTo(yAxisLeft - 2, this.height - this.padding - this.xAxisHeight - this.scrollHeight - 10)
+        // splitAxis
+        ctx.moveTo(yAxisLeft - 10, this.padding + 10)
+        ctx.lineTo(yAxisLeft - 2, this.padding + 10)
+        ctx.moveTo(yAxisLeft - 10, this.padding + yBlockHeight)
+        ctx.lineTo(yAxisLeft - 2, this.padding + yBlockHeight)
+        ctx.moveTo(yAxisLeft - 10, this.padding + yBlockHeight * 2 - 10)
+        ctx.lineTo(yAxisLeft - 2, this.padding + yBlockHeight * 2 - 10)
+        ctx.fillText('1', yAxisLeft - 15, this.padding + 10)
+        ctx.fillText('0', yAxisLeft - 15, this.padding + yBlockHeight)
+        ctx.fillText('-1', yAxisLeft - 15, this.padding + yBlockHeight * 2 - 10)
       }
+      ctx.stroke()
 
-      const option = {
-        tooltip: {
-          trigger: 'axis'
-        },
-        toolbox: {
-          feature: {
-            dataZoom: {
-              yAxisIndex: 'none'
-            },
-            restore: {},
-            saveAsImage: {}
-          }
-        },
-        axisPointer: {
-          link: { xAxisIndex: 'all' }
-        },
-        dataZoom,
-        grid,
-        xAxis,
-        yAxis,
-        series
+      // 0 轴
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      if (channels === 2) {
+        ctx.moveTo(yAxisLeft, this.padding + yBlockHeight)
+        ctx.lineTo(this.width - this.padding, this.padding + yBlockHeight)
+        ctx.moveTo(yAxisLeft, this.padding + yBlockHeight * 3)
+        ctx.lineTo(this.width - this.padding, this.padding + yBlockHeight * 3)
+      } else {
+        ctx.moveTo(yAxisLeft, this.padding + yBlockHeight)
+        ctx.lineTo(this.width - this.padding, this.padding + yBlockHeight)
       }
-
-      console.log(option)
-
-      this._echartInstance.setOption(option)
-
-      window.addEventListener('resize', this._echartInstance.resize)
+      ctx.stroke()
+    },
+    // 绘制点
+    drawPoints(params) {
+      const { ctx, channels } = params
+      // 波形图半程高度
+      const yBlockHeight = (this.height - this.padding * 2 - this.xAxisHeight - this.scrollHeight) / (channels === 2 ? 4 : 2)
+      // y轴基点距左边距离
+      const yAxisLeft = this.yAxisWidth + this.padding
+      const xAxisWidth = this.width - 10 * 2 - this.yAxisWidth - 2
+      const dataLength = this.startIndex === this.endIndex ? this._audioData.frameIndex.length : this.endIndex - this.startIndex
+      const step = dataLength / xAxisWidth // 一个像素点取一个数据
+      const sampleDataLength = Math.floor(dataLength / step)
+      // 计算数据点的位置
+      this._audioData.chartWaveData = Array.isArray(this._audioData.chartWaveData) ? this._audioData.chartWaveData : []
+      let calcParam = {
+        sampleDataLength,
+        step,
+        startIndex: this.startIndex,
+        channel: 0,
+        startX: yAxisLeft + 2,
+        startY: this.padding + 10,
+        width: xAxisWidth,
+        height: yBlockHeight * 2 - 20
+      }
+      this._audioData.chartWaveData[0] = this.calcDataPoint(calcParam)
+      // this._audioData.chartWaveData[0] = this.calcAllDataPoint(calcParam)
+      if (channels === 2) {
+        calcParam = {
+          ...calcParam,
+          channel: 1,
+          startY: this.padding + yBlockHeight * 2 + 10
+        }
+        this._audioData.chartWaveData[1] = this.calcDataPoint(calcParam)
+        // this._audioData.chartWaveData[1] = this.calcAllDataPoint(calcParam)
+      }
+      // 绘制点
+      let drawParam = {
+        ctx,
+        channel: 0
+      }
+      this.drawCalcedPoints(drawParam)
+      if (channels === 2) {
+        drawParam = {
+          ...drawParam,
+          channel: 1
+        }
+        this.drawCalcedPoints(drawParam)
+      }
+    },
+    // 计算数据点的位置
+    calcDataPoint(params) {
+      const { sampleDataLength, step, startIndex, channel, startX, startY, width, height } = params
+      const tempArray = new Float32Array(Math.floor(sampleDataLength) * 3)
+      for (let i = 0; i < sampleDataLength; i++) {
+        tempArray[i * 3] = this._audioData.channelData[channel][Math.floor(i * step + startIndex)]
+        tempArray[i * 3 + 1] = startX + width * i / sampleDataLength
+        tempArray[i * 3 + 2] = startY - (tempArray[i * 3] - 1) * height / 2
+      }
+      return tempArray
+    },
+    // 绘制数据点
+    drawCalcedPoints(params) {
+      const { ctx, channel } = params
+      ctx.fillStyle = this.color
+      ctx.strokeStyle = this.color
+      ctx.lineWidth = 1
+      const length = this._audioData.chartWaveData[0].length / 3
+      ctx.beginPath()
+      ctx.moveTo(this._audioData.chartWaveData[channel][1], this._audioData.chartWaveData[channel][2])
+      // 只有数据量少于像素点数量的时候才绘制点
+      if (this.lessThanPixel) {
+        for (let i = 0; i < length; i++) {
+          ctx.fillRect(this._audioData.chartWaveData[channel][i * 3 + 1] - 1, this._audioData.chartWaveData[channel][i * 3 + 2] - 1, 3, 3)
+          ctx.lineTo(this._audioData.chartWaveData[channel][i * 3 + 1], this._audioData.chartWaveData[channel][i * 3 + 2])
+        }
+      } else {
+        for (let i = 0; i < length; i++) {
+          ctx.lineTo(this._audioData.chartWaveData[channel][i * 3 + 1], this._audioData.chartWaveData[channel][i * 3 + 2])
+        }
+      }
+      ctx.stroke()
+    },
+    // 计算所有数据点的位置
+    calcAllDataPoint(params) {
+      const { channel, startX, startY, width, height } = params
+      const length = this._audioData.channelData[channel].length / 2
+      const tempArray = new Float32Array(Math.floor(length) * 3)
+      for (let i = 0; i < length; i++) {
+        tempArray[i * 3] = this._audioData.channelData[channel][i]
+        tempArray[i * 3 + 1] = startX + width * i / length
+        tempArray[i * 3 + 2] = startY - (tempArray[i * 3] - 1) * height / 2
+      }
+      return tempArray
     }
   }
 }
@@ -193,5 +235,9 @@ export default {
 .main {
   width: 100%;
   height: 100%;
+  .chart {
+    width: 100%;
+    height: 100%;
+  }
 }
 </style>
