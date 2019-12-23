@@ -1,6 +1,6 @@
 <template>
   <div ref="chartContainer" class="main">
-    <canvas ref="chart" class="chart" />
+    <canvas ref="chart" class="chart" @mousewheel="handleOnWheel" />
   </div>
 </template>
 
@@ -57,10 +57,8 @@ export default {
     // 绘制坐标系
     drawAxis(params) {
       const { ctx, channels } = params
-      // 波形图半程高度
-      const yBlockHeight = (this.height - this.padding * 2 - this.xAxisHeight - this.scrollHeight) / (channels === 2 ? 4 : 2)
-      // y轴基点距左边距离
-      const yAxisLeft = this.yAxisWidth + this.padding
+
+      const { yBlockHeight, yAxisLeft } = this.generateCommonData()
 
       ctx.strokeStyle = this.axisColor || this.color
       ctx.fillStyle = this.axisColor || this.color
@@ -72,7 +70,17 @@ export default {
       // x 轴
       ctx.moveTo(yAxisLeft, this.height - this.padding - this.xAxisHeight - this.scrollHeight)
       ctx.lineTo(this.width - this.padding, this.height - this.padding - this.xAxisHeight - this.scrollHeight)
+
+      // splitAxis
+      ctx.moveTo(yAxisLeft + 1, this.height - this.padding - this.xAxisHeight - this.scrollHeight + 2)
+      ctx.lineTo(yAxisLeft + 1, this.height - this.padding - this.xAxisHeight - this.scrollHeight + 10)
+      ctx.moveTo(this.width - this.padding - 1, this.height - this.padding - this.xAxisHeight - this.scrollHeight + 2)
+      ctx.lineTo(this.width - this.padding - 1, this.height - this.padding - this.xAxisHeight - this.scrollHeight + 10)
       ctx.stroke()
+      ctx.textAlign = 'left'
+      ctx.fillText(this.startIndex, yAxisLeft, this.height - this.padding - this.scrollHeight)
+      ctx.textAlign = 'right'
+      ctx.fillText(this.startIndex === this.endIndex ? this._audioData.frameIndex.length - 1 : this.startIndex, this.width - this.padding, this.height - this.padding - this.scrollHeight)
 
       // y 轴
       ctx.beginPath()
@@ -136,13 +144,11 @@ export default {
     // 绘制点
     drawPoints(params) {
       const { ctx, channels } = params
-      // 波形图半程高度
-      const yBlockHeight = (this.height - this.padding * 2 - this.xAxisHeight - this.scrollHeight) / (channels === 2 ? 4 : 2)
-      // y轴基点距左边距离
-      const yAxisLeft = this.yAxisWidth + this.padding
-      const xAxisWidth = this.width - 10 * 2 - this.yAxisWidth - 2
+
+      const { xAxisWidth, waveArea } = this.generateCommonData()
+
       const dataLength = this.startIndex === this.endIndex ? this._audioData.frameIndex.length : this.endIndex - this.startIndex
-      const step = dataLength / xAxisWidth // 一个像素点取一个数据
+      const step = dataLength / xAxisWidth > 10 ? dataLength / xAxisWidth / 10 : 1 // 一个像素点取十个或一个数据
       const sampleDataLength = Math.floor(dataLength / step)
       // 计算数据点的位置
       this._audioData.chartWaveData = Array.isArray(this._audioData.chartWaveData) ? this._audioData.chartWaveData : []
@@ -151,10 +157,7 @@ export default {
         step,
         startIndex: this.startIndex,
         channel: 0,
-        startX: yAxisLeft + 2,
-        startY: this.padding + 10,
-        width: xAxisWidth,
-        height: yBlockHeight * 2 - 20
+        ...waveArea[0]
       }
       this._audioData.chartWaveData[0] = this.calcDataPoint(calcParam)
       // this._audioData.chartWaveData[0] = this.calcAllDataPoint(calcParam)
@@ -162,7 +165,7 @@ export default {
         calcParam = {
           ...calcParam,
           channel: 1,
-          startY: this.padding + yBlockHeight * 2 + 10
+          ...waveArea[1]
         }
         this._audioData.chartWaveData[1] = this.calcDataPoint(calcParam)
         // this._audioData.chartWaveData[1] = this.calcAllDataPoint(calcParam)
@@ -225,6 +228,73 @@ export default {
         tempArray[i * 3 + 2] = startY - (tempArray[i * 3] - 1) * height / 2
       }
       return tempArray
+    },
+    // 滚轮缩放
+    handleOnWheel(e) {
+      let action = 'enlarge'
+      if (e.wheelDelta < 0) action = 'shrink'
+      const { offsetX, offsetY } = e
+      if (this.isInWaveArea({ offsetX, offsetY })) {
+        const { waveArea } = this.generateCommonData()
+        // 目前数据长度
+        const dataLength = this.startIndex === this.endIndex ? this._audioData.frameIndex.length : this.endIndex - this.startIndex
+        // 缩放事件数据点
+        const dataPoint = (offsetX - waveArea[0].startX) / waveArea[0].width * dataLength + this.startIndex
+        // 放大
+        if (action === 'enlarge') {
+          console.log('d')
+        } else {
+          // 缩小
+          console.log('d')
+        }
+      }
+    },
+    // 是否在波形区
+    isInWaveArea(params) {
+      const { offsetX, offsetY } = params
+      const { channels, waveArea } = this.generateCommonData()
+      if (offsetX > waveArea[0].startX && offsetX < waveArea[0].endX && offsetY > waveArea[0].startY && offsetY < waveArea[0].endY) {
+        return true
+      }
+      if (channels === 2 && offsetX > waveArea[1].startX && offsetX < waveArea[1].endX && offsetY > waveArea[1].startY && offsetY < waveArea[1].endY) {
+        return true
+      }
+      return false
+    },
+    // 生成通用数据
+    generateCommonData() {
+      const channels = this._audioData.rawBuffer.numberOfChannels
+      // 波形图半程高度
+      const yBlockHeight = (this.height - this.padding * 2 - this.xAxisHeight - this.scrollHeight) / (channels === 2 ? 4 : 2)
+      // y轴基点距左边距离
+      const yAxisLeft = this.yAxisWidth + this.padding
+      const xAxisWidth = this.width - 10 * 2 - this.yAxisWidth - 2
+
+      // 波形区
+      const waveArea = []
+      waveArea[0] = {
+        startX: yAxisLeft + 2,
+        startY: this.padding + 10,
+        width: xAxisWidth,
+        height: yBlockHeight * 2 - 20,
+        endX: yAxisLeft + 2 + xAxisWidth,
+        endY: this.padding + yBlockHeight * 2 - 10
+      }
+      if (channels === 2) {
+        waveArea[1] = {
+          ...waveArea[0],
+          startY: this.padding + yBlockHeight * 2 + 10,
+          endY: this.padding + yBlockHeight * 4 - 10
+        }
+      }
+
+      return {
+        channels,
+        yBlockHeight,
+        yAxisLeft,
+        xAxisWidth,
+        waveArea
+      }
     }
   }
 }
