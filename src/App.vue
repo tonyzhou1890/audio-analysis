@@ -94,7 +94,7 @@ export default {
           } else {
             console.log('声道数只能是1或2')
           }
-          this.$refs.main.draw()
+          this.$refs.main.draw(true)
         }, (e) => {
           console.log(e)
         })

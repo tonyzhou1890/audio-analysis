@@ -6,7 +6,7 @@
 
 <script>
 export default {
-  name: 'Panel',
+  name: 'Main',
   props: {
     file: {
       type: Object,
@@ -43,7 +43,8 @@ export default {
       this.height = rect.height
     },
     // 绘制canvas
-    draw() {
+    // 参数：init，是否重置，比如打开文件时需要重置
+    draw(init) {
       // 声道数
       const channels = this._audioData.rawBuffer.numberOfChannels
       const chart = this.$refs.chart
@@ -51,6 +52,10 @@ export default {
       chart.height = this.height
       const ctx = chart.getContext('2d')
       window.ctx = ctx
+      if (init) {
+        this.startIndex = 0
+        this.endIndex = 0
+      }
       this.drawAxis({ ctx, channels })
       this.drawPoints({ ctx, channels })
     },
@@ -80,7 +85,7 @@ export default {
       ctx.textAlign = 'left'
       ctx.fillText(this.startIndex, yAxisLeft, this.height - this.padding - this.scrollHeight)
       ctx.textAlign = 'right'
-      ctx.fillText(this.startIndex === this.endIndex ? this._audioData.frameIndex.length - 1 : this.startIndex, this.width - this.padding, this.height - this.padding - this.scrollHeight)
+      ctx.fillText(this.startIndex === this.endIndex ? this._audioData.frameIndex.length - 1 : this.endIndex, this.width - this.padding, this.height - this.padding - this.scrollHeight)
 
       // y 轴
       ctx.beginPath()
@@ -239,14 +244,40 @@ export default {
         // 目前数据长度
         const dataLength = this.startIndex === this.endIndex ? this._audioData.frameIndex.length : this.endIndex - this.startIndex
         // 缩放事件数据点
-        const dataPoint = (offsetX - waveArea[0].startX) / waveArea[0].width * dataLength + this.startIndex
+        const dataPoint = Math.floor((offsetX - waveArea[0].startX) / waveArea[0].width * dataLength + this.startIndex)
+        // 计算放大/缩小后的开始和结束索引
+        let newStartIndex = this.startIndex
+        let newEndIndex = this.endIndex
         // 放大
         if (action === 'enlarge') {
-          console.log('d')
+          // 如果已经放大到最大，不操作
+          if (newEndIndex !== newStartIndex && newEndIndex - newStartIndex <= waveArea[0].width) return
+          // 放大的最大程度是一像素一个数据点
+          if (dataLength < waveArea[0].width * 2) {
+            newStartIndex = dataPoint - (offsetX - waveArea[0].startX)
+            newEndIndex = newStartIndex + waveArea[0].width
+          } else { // 缩放倍率是0.5
+            newStartIndex = Math.floor((dataPoint + newStartIndex) / 2)
+            newEndIndex = this.startIndex === this.endIndex ? Math.floor((this._audioData.frameIndex.length - 1 + dataPoint) / 2) : Math.floor((newEndIndex + dataPoint) / 2)
+          }
         } else {
           // 缩小
-          console.log('d')
+          // 如果已经最小，即处于原始大小，不操作
+          if (newStartIndex === newEndIndex || (newStartIndex === 0 && newEndIndex === this._audioData.frameIndex.length - 1)) return
+          // 如果总长度不足当前长度的两倍，则为总长度
+          if (this._audioData.frameIndex.length - 1 <= (newEndIndex - newStartIndex) * 2) {
+            newStartIndex = 0
+            newEndIndex = 0
+          } else {
+            newStartIndex = newStartIndex * 2 - dataPoint
+            newEndIndex = newEndIndex * 2 - dataPoint
+          }
         }
+        this.startIndex = newStartIndex
+        this.endIndex = newEndIndex
+
+        // 绘制
+        this.draw()
       }
     },
     // 是否在波形区
