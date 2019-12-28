@@ -57,17 +57,22 @@
 </template>
 
 <script>
+import { noAudio } from '../utils/utils'
 export default {
   name: 'Panel',
   props: {
     file: {
       type: Object,
       default: () => ({})
+    },
+    filterFunctionDone: {
+      type: Function,
+      default: () => () => {}
     }
   },
   data() {
     return {
-      placeholder: `请在这里输入音频过滤函数\r\n请注意，函数需要是箭头函数，比如：() => 1`,
+      placeholder: `请在这里输入音频过滤函数\r\n请注意，函数需要是箭头函数，比如：() => 1\r\n参数是一个对象，包括 channel、data、len`,
       filterFunctionText: '',
       errorInfo: ''
     }
@@ -81,9 +86,26 @@ export default {
         }
         this.errorInfo = ''
         this.filterFunction = temp
+        if (noAudio()) {
+          throw new Error('没有音频')
+        } else {
+          const len = this._audioData.frameIndex.length
+          for (let channel = 0; channel < this._audioData.buffer.numberOfChannels; channel++) {
+            this.filterFunction({
+              channel,
+              data: this._audioData.channelData[channel],
+              len
+            })
+          }
+          this.filterFunctionDone()
+        }
       } catch (e) {
         this.errorInfo = e.message
       }
+    },
+    clear() {
+      this.filterFunctionText = ''
+      this.errorInfo = ''
     }
   }
 }
@@ -120,6 +142,7 @@ export default {
       width: 100%;
       height: 200px;
       resize: none;
+      background-color: #ccc;
     }
   }
   .apply {

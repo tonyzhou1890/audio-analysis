@@ -46,7 +46,7 @@ export default {
     // 参数：init，是否重置，比如打开文件时需要重置
     draw(init) {
       // 声道数
-      const channels = this._audioData.rawBuffer.numberOfChannels
+      const channels = this._audioData.buffer.numberOfChannels
       const chart = this.$refs.chart
       chart.width = this.width
       chart.height = this.height
@@ -294,7 +294,7 @@ export default {
     },
     // 生成通用数据
     generateCommonData() {
-      const channels = this._audioData.rawBuffer.numberOfChannels
+      const channels = this._audioData.buffer.numberOfChannels
       // 波形图半程高度
       const yBlockHeight = (this.height - this.padding * 2 - this.xAxisHeight - this.scrollHeight) / (channels === 2 ? 4 : 2)
       // y轴基点距左边距离
@@ -326,6 +326,12 @@ export default {
         xAxisWidth,
         waveArea
       }
+    },
+    // 清除
+    clear() {
+      const chart = this.$refs.chart
+      chart.width = this.width
+      chart.height = this.height
     }
   }
 }

@@ -17,5 +17,21 @@ export const menu = [
       name: '清空',
       action: 'clear'
     }
+  ],
+  [
+    {
+      name: '播放',
+      action: 'play',
+      activeHighlight: true
+    },
+    {
+      name: '暂停',
+      action: 'pause',
+      activeHighlight: true
+    },
+    {
+      name: '停止',
+      action: 'stop'
+    }
   ]
 ]

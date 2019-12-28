@@ -9,7 +9,6 @@ Vue.prototype._audioCtx = new AudioContext()
 // 音频数据
 const audioData = {
   raw: null,
-  rawBuffer: null,
   channelData: []
 }
 window._audioData = Vue.prototype._audioData = audioData

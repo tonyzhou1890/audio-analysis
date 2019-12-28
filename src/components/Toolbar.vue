@@ -9,6 +9,7 @@
         v-for="item in group"
         :key="item.name"
         class="menu-button"
+        :class="active === item.action && item.activeHighlight ? 'highlight' : ''"
         @click="() => trigger(item.action)"
       >{{ item.name }}</button>
       <span v-if="index !== menu.length - 1" class="divided" />
@@ -23,6 +24,10 @@ export default {
     menu: {
       type: Array,
       default: () => []
+    },
+    active: {
+      type: String,
+      default: ''
     }
   },
   methods: {
@@ -64,6 +69,9 @@ export default {
       &:focus {
         border: 0;
         outline: 0;
+      }
+      &.highlight {
+        text-shadow: 0px 0px 2px #eee;
       }
     }
     .divided {
