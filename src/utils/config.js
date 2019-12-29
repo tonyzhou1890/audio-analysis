@@ -33,5 +33,11 @@ export const menu = [
       name: '停止',
       action: 'stop'
     }
+  ],
+  [
+    {
+      name: '保存',
+      action: 'save'
+    }
   ]
 ]

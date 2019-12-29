@@ -33,6 +33,7 @@
 </template>
 
 <script>
+import toWav from 'audiobuffer-to-wav'
 import { menu } from './utils/config'
 import { noAudio } from './utils/utils'
 import Toolbar from './components/Toolbar'
@@ -77,6 +78,9 @@ export default {
           break
         case 'stop':
           this.stop()
+          break
+        case 'save':
+          this.save()
           break
         default:
           break
@@ -225,6 +229,23 @@ export default {
         this._audioData.source.stop()
         this._audioData.source.disconnect()
         this.stopTime = 0
+      }
+    },
+    // 保存音频
+    save() {
+      const active = this.active
+      this.setActiveAsync(active)
+      if (!noAudio()) {
+        const wav = toWav(this._audioData.buffer)
+        const blob = new Blob([wav], {
+          type: 'audio/mpeg'
+        })
+        const downloadUrl = window.URL.createObjectURL(blob)
+        const anchor = document.createElement('a')
+        anchor.href = downloadUrl
+        anchor.download = `${this.file.name}`
+        anchor.click()
+        window.URL.revokeObjectURL(blob)
       }
     },
     // 左侧面板处理完音频
