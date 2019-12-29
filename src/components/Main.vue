@@ -273,6 +273,9 @@ export default {
             newEndIndex = newEndIndex * 2 - dataPoint
           }
         }
+        // 处理越界
+        if (newStartIndex < 0) newStartIndex = 0
+        if (newEndIndex >= this._audioData.frameIndex.length) newEndIndex = this._audioData.frameIndex.length - 1
         this.startIndex = newStartIndex
         this.endIndex = newEndIndex
 

@@ -60,6 +60,12 @@ export default {
         case 'openFile':
           this.openFile()
           break
+        case 'newFile':
+          this.newFile()
+          break
+        case 'restore':
+          this.restore()
+          break
         case 'clear':
           this.clear()
           break
@@ -136,8 +142,42 @@ export default {
       }
     },
     // 创建音频-默认10秒
-    create() {
-      console.log('create')
+    newFile() {
+      this.clear()
+      const buffer = this._audioCtx.createBuffer(2, this._audioCtx.sampleRate * 10, this._audioCtx.sampleRate)
+      const temp = {
+        name: '新文件',
+        type: '',
+        size: '',
+        duration: buffer.duration,
+        length: buffer.length,
+        sampleRate: buffer.sampleRate,
+        numberOfChannels: buffer.numberOfChannels
+      }
+      this._audioData.raw = this.file = temp
+      this._audioData.buffer = buffer
+      this._audioData.frameIndex = new Uint32Array(buffer.length)
+      for (let i = 0; i < buffer.length; i++) {
+        this._audioData.frameIndex[i] = i
+      }
+      this._audioData.channelData = [buffer.getChannelData(0), buffer.getChannelData(1)]
+      this.$refs.main.draw(true)
+      // 备份原来的声音数据
+      setTimeout(this.setRawChannelData(), 0)
+    },
+    // 复原
+    restore() {
+      if (!noAudio()) {
+        const len = this._audioData.frameIndex.length
+        if (this._audioData.channelData && this._audioData.channelData.length) {
+          for (let channel = 0; channel < this._audioData.buffer.numberOfChannels; channel++) {
+            for (let i = 0; i < len; i++) {
+              this._audioData.channelData[channel][i] = this._audioData.rawChannelData[channel][i]
+            }
+          }
+        }
+        this.$refs.main.draw(true)
+      }
     },
     // 清空
     clear() {
