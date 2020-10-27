@@ -17,6 +17,7 @@ export default {
     return {
       width: null,
       height: null,
+      pointsPerPx: 10, // 每个像素点最多多少个数据
       padding: 10, // canvas padding
       yAxisWidth: 30, // y轴宽度--包括文字
       xAxisHeight: 20, // x轴高度--包括文字
@@ -153,7 +154,7 @@ export default {
       const { xAxisWidth, waveArea } = this.generateCommonData()
 
       const dataLength = this.startIndex === this.endIndex ? this._audioData.frameIndex.length : this.endIndex - this.startIndex
-      const step = dataLength / xAxisWidth > 10 ? dataLength / xAxisWidth / 10 : 1 // 一个像素点取十个或一个数据
+      const step = dataLength / xAxisWidth > this.pointsPerPx ? dataLength / xAxisWidth / this.pointsPerPx : 1 // 一个像素点取十个或一个数据
       const sampleDataLength = Math.floor(dataLength / step)
       // 计算数据点的位置
       this._audioData.chartWaveData = Array.isArray(this._audioData.chartWaveData) ? this._audioData.chartWaveData : []

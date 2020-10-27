@@ -2,6 +2,9 @@ import Vue from 'vue'
 import App from './App.vue'
 import './styles/index.less'
 import './utils/global'
+import * as example from './utils/example'
+
+window.example = example
 
 Vue.config.productionTip = false
 

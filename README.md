@@ -1,24 +1,4 @@
 # audio-analysis
 
-## Project setup
-```
-yarn install
-```
-
-### Compiles and hot-reloads for development
-```
-yarn serve
-```
-
-### Compiles and minifies for production
-```
-yarn build
-```
-
-### Lints and fixes files
-```
-yarn lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+&emsp;&emsp;音频时域显示工具。
+&emsp;&emsp;本来是想合成音频的，但能力有限。可以在控制台（开发者工具 -> console）通过 window.example 查看可用示例函数。window._g 是公共函数。

@@ -66,3 +66,22 @@ export const regularNoise1 = (param, f = 80, a = 1, w = 0) => {
     param.data[i] = param.data[i] > 0 ? param.data[i] - append : param.data[i] + append
   }
 }
+
+/**
+ * 渐进频率
+ * @param {object} param
+ * @param {number} startF 开始频率
+ * @param {number} endF 结束频率
+ * @param {number} step 频率步进
+ */
+export const progressiveFrequency = (param, startF = 20, endF = 20000, step = 1) => {
+  const interval = Math.floor(param.len / Math.abs(endF - startF) * step)
+  let min = Math.min(startF, endF)
+  const max = Math.max(startF, endF)
+  for (let i = 0; i < param.len; i++) {
+    if (i % interval === 0) {
+      min = min < max ? min + step : min
+    }
+    param.data[i] = window._g.sineWave(i, min)
+  }
+}
