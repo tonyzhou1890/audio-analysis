@@ -142,7 +142,17 @@ export default {
       width: 100%;
       height: 200px;
       resize: none;
-      background-color: #ccc;
+      background-color: #3e2b2b;
+      color: seashell;
+      padding: 5px;
+      border-radius: 0;
+      border: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      &:focus,
+      &:active {
+        outline: 2px solid rgba(65, 88, 218, 0.8);
+        border: 0;
+      }
     }
   }
   .apply {
