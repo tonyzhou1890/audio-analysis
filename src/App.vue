@@ -34,6 +34,8 @@
 
 <script>
 import toWav from 'audiobuffer-to-wav'
+// import audioEncoder from 'audio-encoder'
+// import fileSaver from 'file-saver'
 import { menu } from './utils/config'
 import { noAudio } from './utils/utils'
 import Toolbar from './components/Toolbar'
@@ -99,7 +101,9 @@ export default {
       const fs = new FileReader()
       fs.readAsArrayBuffer(temp)
       fs.onload = (e) => {
+        console.time('decodeAudioData')
         this._audioCtx.decodeAudioData(e.target.result, (buffer) => {
+          console.timeEnd('decodeAudioData')
           this._audioData.raw = temp
           this._audioData.buffer = buffer
           this.file = {
@@ -111,7 +115,7 @@ export default {
             sampleRate: buffer.sampleRate,
             numberOfChannels: buffer.numberOfChannels
           }
-          
+
           this.setChannelDataList(buffer)
           this.$refs.main.draw(true)
         }, (e) => {
@@ -134,7 +138,7 @@ export default {
         cancel: function() {
           console.log('取消创建音频')
         },
-        content: '请输入音频时长(0~300秒)' // 内容描述
+        content: '请输入音频时长(1~300秒)' // 内容描述
       })
     },
     // 创建音频
@@ -152,12 +156,13 @@ export default {
       }
       this._audioData.raw = this.file = temp
       this._audioData.buffer = buffer
-      
+
       this.setChannelDataList(buffer)
       this.$refs.main.draw(true)
     },
     // 设置供修改的声道数据
     setChannelDataList(buffer) {
+      console.time('setChannelDataList')
       if (buffer.numberOfChannels === 1) {
         this._audioData.channelDataList = [
           [buffer.getChannelData(0)]
@@ -169,7 +174,8 @@ export default {
       } else {
         console.log('声道数只能是1或2')
       }
-      this._audioData.lastChannelData = this._audioData.channelDataList.slice(-1) || []
+      this._audioData.lastChannelData = this._audioData.channelDataList.slice(-1)[0] || []
+      console.timeEnd('setChannelDataList')
     },
     // 复原
     restore() {
@@ -205,7 +211,7 @@ export default {
         this._audioData.source.connect(this._audioCtx.destination)
         this._audioData.source.start(0, this.stopTime || 0)
         this._audioData.source.onended = () => {
-          this.active = ''
+          this.setActiveAsync()
         }
       }
     },
@@ -228,8 +234,6 @@ export default {
     },
     // 保存音频
     save() {
-      const active = this.active
-      this.setActiveAsync(active)
       if (!noAudio()) {
         const wav = toWav(this._audioData.buffer)
         const blob = new Blob([wav], {
@@ -241,7 +245,11 @@ export default {
         anchor.download = `${this.file.name}`
         anchor.click()
         window.URL.revokeObjectURL(blob)
+        // audioEncoder(this._audioData.buffer, 'WAV', null, (blob) => {
+        //   fileSaver.saveAs(blob, this.file.name)
+        // })
       }
+      this.setActiveAsync()
     },
     // 左侧面板处理完音频
     filterFunctionDone() {
@@ -275,13 +283,14 @@ export default {
   .body-wrapper {
     width: 100%;
     height: calc(~'100%' - @toolbarHeight);
-    display: flex;
     .panel-wrapper {
       width: 300px;
       height: 100%;
+      float: left;
     }
     .main-wrapper {
-      flex: 1;
+      float: left;
+      width: calc(~'100% - 300px');
       height: 100%;
     }
   }

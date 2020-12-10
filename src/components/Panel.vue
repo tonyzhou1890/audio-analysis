@@ -89,11 +89,11 @@ export default {
         if (noAudio()) {
           throw new Error('没有音频')
         } else {
-          const len = this._audioData.frameIndex.length
+          const len = this._audioData.buffer.length
           for (let channel = 0; channel < this._audioData.buffer.numberOfChannels; channel++) {
             this.filterFunction({
               channel,
-              data: this._audioData.channelData[channel],
+              data: this._audioData.lastChannelData[channel],
               len
             })
           }
@@ -142,7 +142,7 @@ export default {
       width: 100%;
       height: 200px;
       resize: none;
-      background-color: #3e2b2b;
+      background-color: #2c3e50;
       color: seashell;
       padding: 5px;
       border-radius: 0;

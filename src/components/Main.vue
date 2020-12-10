@@ -41,7 +41,7 @@ export default {
   methods: {
     // setSize
     setSize() {
-      const rect = this.$refs.chart.getBoundingClientRect()
+      const rect = this.$refs.chartContainer.getBoundingClientRect()
       this.width = rect.width
       this.height = rect.height
       this.zr.resize({
@@ -56,9 +56,11 @@ export default {
         this.startIndex = 0
         this.endIndex = 0
       }
+      console.time('draw')
       this.zr.clear()
       this.drawAxis()
-      // this.drawPoints()
+      this.drawPoints()
+      console.timeEnd('draw')
     },
     // 绘制坐标系
     drawAxis() {
@@ -129,7 +131,7 @@ export default {
       const xAxisRightText = new this.zrender.Text({
         style: {
           ...style,
-          text: this.startIndex === this.endIndex ? this._audioData.frameIndex.length - 1 : this.endIndex,
+          text: this.endIndex,
           textAlign: 'right',
           lineWidth: 0
         },
@@ -177,22 +179,151 @@ export default {
             position: p
           }))
         })
+
+        // y = 0
+        const yZero = new this.zrender.Line({
+          shape: {
+            x1: xAxisStart[0],
+            y1: (wave.startY + wave.endY) / 2,
+            x2: xAxisEnd[0],
+            y2: (wave.startY + wave.endY) / 2
+          },
+          style: {
+            ...style,
+            lineWidth: 1
+          },
+          cursor: 'default'
+        })
+        this.zr.add(yZero)
       })
     },
     // 绘制点
     drawPoints(params) {
+      const { xAxisWidth, waveArea } = this.generateCommonData()
+
+      // 步进。总的点数除以轴允许的数据点数（像素点乘以每像素数据点）。步进最小为1，即每个数据点都绘制。
+      let step = (this.endIndex - this.startIndex) / (xAxisWidth * this.pointsPerPx)
+      step = step < 1 ? 1 : step
+      // 先清空波形数据
+      this._audioData.chartWaveData = []
+
+      waveArea.map((wave, index) => {
+        // 绘制波形区域矩形，用来响应滚轮事件
+        const rect = new this.zrender.Rect({
+          shape: {
+            x: wave.startX,
+            y: wave.startY,
+            width: wave.width,
+            height: wave.height
+          },
+          cursor: 'default',
+          invisible: true
+        })
+        this.zr.add(rect)
+        rect.on('mousewheel', this.handleOnWheel, this)
+
+        // 计算绘制点
+        const calcParam = {
+          step,
+          channel: index,
+          ...wave
+        }
+        this._audioData.chartWaveData[index] = this.calcDataPoint(calcParam)
+        this.drawCalcedPoints({ channel: index })
+      })
     },
     // 计算数据点的位置
     calcDataPoint(params) {
+      const { step, channel, startX, startY, width, height } = params
+      console.time(`calcDataPoints channel${channel}`)
+      // 需要的数据点数量
+      const pointsLen = ((this.endIndex - this.startIndex) / step) | 0
+      // 每个数据点占用三个元素，第一个是数据本身，第二个是 x 轴位置，第三个是 y 轴位置
+      const arr = new Float32Array(pointsLen * 3)
+      for (let i = 0; i < pointsLen; i++) {
+        arr[i * 3] = this._audioData.lastChannelData[channel][(i * step + this.startIndex) | 0]
+        arr[i * 3 + 1] = startX + width * (i / pointsLen)
+        arr[i * 3 + 2] = startY - (arr[i * 3] - 1) * height / 2
+      }
+      console.timeEnd(`calcDataPoints channel${channel}`)
+      return arr
     },
     // 绘制数据点
     drawCalcedPoints(params) {
-    },
-    // 计算所有数据点的位置
-    calcAllDataPoint(params) {
+      const { channel } = params
+      console.time(`drawCalcedPoints channel${channel}`)
+
+      // 样式
+      const style = {
+        stroke: this.color,
+        fill: 'none',
+        lineWidth: 1
+      }
+      // 点数量
+      const len = this._audioData.chartWaveData[channel].length / 3
+      const points = new Array(len)
+      for (let i = 0; i < len; i++) {
+        points[i] = [
+          this._audioData.chartWaveData[channel][i * 3 + 1],
+          this._audioData.chartWaveData[channel][i * 3 + 2]
+        ]
+      }
+      const polyline = new this.zrender.Polyline({
+        shape: {
+          points
+        },
+        style
+      })
+      polyline.on('mousewheel', this.handleOnWheel, this)
+      this.zr.add(polyline)
+      console.timeEnd(`drawCalcedPoints channel${channel}`)
     },
     // 滚轮缩放
     handleOnWheel(e) {
+      let action = 'enlarge'
+      if (e.wheelDelta < 0) action = 'shrink'
+      const { offsetX } = e
+      const { waveArea } = this.generateCommonData()
+      // 目前数据长度
+      const dataLength = this.endIndex - this.startIndex
+      // 缩放事件数据点
+      const dataPoint = Math.floor((offsetX - waveArea[0].startX) / waveArea[0].width * dataLength + this.startIndex)
+      // 计算放大/缩小后的开始和结束索引
+      let newStartIndex = this.startIndex
+      let newEndIndex = this.endIndex
+      // 放大
+      if (action === 'enlarge') {
+        // 如果已经放大到最大，不操作
+        if (newEndIndex - newStartIndex <= waveArea[0].width) return
+        // 放大的最大程度是一像素一个数据点
+        if (dataLength < waveArea[0].width * 2) {
+          newStartIndex = dataPoint - (offsetX - waveArea[0].startX)
+          newEndIndex = newStartIndex + waveArea[0].width
+        } else { // 缩放倍率是0.5
+          newStartIndex = Math.floor((dataPoint + newStartIndex) / 2)
+          newEndIndex = Math.floor((newEndIndex + dataPoint) / 2)
+        }
+      } else {
+        // 缩小
+        // 如果已经最小，即处于原始大小，不操作
+        if (newStartIndex === 0 && newEndIndex === this._audioData.buffer.length - 1) return
+        // 如果总长度不足当前长度的两倍，则为总长度
+        if (this._audioData.buffer.length - 1 <= (newEndIndex - newStartIndex) * 2) {
+          newStartIndex = 0
+          newEndIndex = this._audioData.buffer.length - 1
+        } else {
+          newStartIndex = newStartIndex * 2 - dataPoint
+          newEndIndex = newEndIndex * 2 - dataPoint
+        }
+      }
+      // 处理越界
+      if (newStartIndex < 0) newStartIndex = 0
+      if (newEndIndex >= this._audioData.buffer.length) newEndIndex = this._audioData.buffer.length - 1
+      this.startIndex = newStartIndex
+      this.endIndex = newEndIndex
+
+      // 绘制
+      this.draw()
     },
     // 是否在波形区
     isInWaveArea(params) {
@@ -200,8 +331,8 @@ export default {
     // 生成通用数据
     generateCommonData() {
       const channels = this._audioData.buffer.numberOfChannels
-      // 波形图半程高度
-      const halfWaveHeight = (this.height - this.padding * 2 - this.xAxisHeight - this.scrollHeight) / (channels === 2 ? 4 : 2)
+      // 波形图半程高度(包括波形图边距)
+      const halfBlockHeight = (this.height - this.padding * 2 - this.xAxisHeight - this.scrollHeight) / (channels === 2 ? 4 : 2)
       // y轴基点距左边距离
       const yAxisLeft = this.yAxisWidth + this.padding
       const xAxisWidth = this.width - 10 * 2 - this.yAxisWidth - 2
@@ -212,21 +343,26 @@ export default {
         startX: yAxisLeft + 2,
         startY: this.padding + 10,
         width: xAxisWidth,
-        height: halfWaveHeight * 2 - 20,
+        height: halfBlockHeight * 2 - 20,
         endX: yAxisLeft + 2 + xAxisWidth,
-        endY: this.padding + halfWaveHeight * 2 - 10
+        endY: this.padding + halfBlockHeight * 2 - 10
       }
       if (channels === 2) {
         waveArea[1] = {
           ...waveArea[0],
-          startY: this.padding + halfWaveHeight * 2 + 10,
-          endY: this.padding + halfWaveHeight * 4 - 10
+          startY: this.padding + halfBlockHeight * 2 + 10,
+          endY: this.padding + halfBlockHeight * 4 - 10
         }
+      }
+
+      // 如果 startIndex 和 endIndex 都是零的初始状态，需要将其设置为正确的数值
+      if (this.startIndex === this.endIndex && this.startIndex === 0) {
+        this.endIndex = this._audioData.lastChannelData[0].length
       }
 
       return {
         channels,
-        halfWaveHeight,
+        halfBlockHeight,
         yAxisLeft,
         xAxisWidth,
         waveArea
@@ -234,7 +370,7 @@ export default {
     },
     // 清除
     clear() {
-      this.resize()
+      this.zr.clear()
     }
   }
 }
